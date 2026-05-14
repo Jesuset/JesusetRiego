@@ -11,15 +11,29 @@
     <link rel="manifest" href="https://jesuset.github.io/JesusetRiego/manifest.json">
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: -apple-system, sans-serif; background: #F1F8E9; }
-        .header { background: #4CAF50; color: white; padding: 20px; text-align: center; }
+        body { font-family: -apple-system, sans-serif; background: #F1F8E9; padding-bottom: 80px; }
+        .header { background: #4CAF50; color: white; padding: 20px; text-align: center; position: sticky; top: 0; z-index: 10; }
         .container { padding: 20px; }
-        .card { background: white; padding: 20px; border-radius: 15px; margin: 10px 0; }
-        .btn { background: #4CAF50; color: white; border: none; padding: 15px 30px; border-radius: 25px; font-size: 18px; cursor: pointer; }
-        .btn-regar { background: #FF9800; margin-top: 10px; }
-        .fab { position: fixed; bottom: 20px; right: 20px; background: #4CAF50; color: white; width: 60px; height: 60px; border-radius: 30px; display: flex; align-items: center; justify-content: center; font-size: 30px; text-decoration: none; box-shadow: 0 4px 12px rgba(0,0,0,0.3); }
+        .card { background: white; padding: 20px; border-radius: 15px; margin: 10px 0; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+        .btn { background: #4CAF50; color: white; border: none; padding: 15px 30px; border-radius: 25px; font-size: 18px; cursor: pointer; width: 100%; margin-top: 10px; }
+        .btn-regar { background: #FF9800; }
+        .btn-foto { background: #2196F3; }
+        .btn-eliminar { background: #f44336; }
+        .fab { position: fixed; bottom: 20px; right: 20px; background: #4CAF50; color: white; width: 60px; height: 60px; border-radius: 30px; display: flex; align-items: center; justify-content: center; font-size: 30px; text-decoration: none; box-shadow: 0 4px 12px rgba(0,0,0,0.3); z-index: 100; }
         .today { background: #FFF9C4; }
-        select, input { width: 100%; padding: 15px; margin: 10px 0; border: 1px solid #ddd; border-radius: 10px; font-size: 16px; }
+        select, input, textarea { width: 100%; padding: 15px; margin: 10px 0; border: 1px solid #ddd; border-radius: 10px; font-size: 16px; }
+        .plant-photo { width: 100%; height: 200px; object-fit: cover; border-radius: 10px; margin: 10px 0; background: #e0e0e0; }
+        .plant-photo-placeholder { width: 100%; height: 200px; border-radius: 10px; margin: 10px 0; background: #e0e0e0; display: flex; align-items: center; justify-content: center; font-size: 60px; color: #999; }
+        .photo-buttons { display: flex; gap: 10px; }
+        .photo-buttons .btn { flex: 1; font-size: 14px; padding: 10px; }
+        .modal { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: white; z-index: 1000; padding: 20px; overflow-y: auto; }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        .close-btn { font-size: 28px; cursor: pointer; color: #666; }
+        .plant-card { display: flex; justify-content: space-between; align-items: center; padding: 15px; border-bottom: 1px solid #eee; }
+        .plant-info { flex: 1; }
+        .plant-actions { display: flex; flex-direction: column; gap: 5px; align-items: flex-end; }
+        .mini-photo { width: 50px; height: 50px; border-radius: 10px; object-fit: cover; margin-right: 10px; }
+        .plant-header { display: flex; align-items: center; }
     </style>
 </head>
 <body>
@@ -30,8 +44,28 @@
     <div class="container" id="app"></div>
     <a href="#" class="fab" onclick="showAddPlant()">+</a>
 
-    <div id="addPlantModal" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:white; z-index:1000; padding:20px; overflow-y:auto;">
-        <h2>🌱 Añadir Nueva Planta</h2>
+    <!-- Modal para Añadir/Editar Planta -->
+    <div class="modal" id="plantModal">
+        <div class="modal-header">
+            <h2 id="modalTitle">🌱 Añadir Nueva Planta</h2>
+            <span class="close-btn" onclick="closeModal()">✕</span>
+        </div>
+        
+        <!-- Vista previa de la foto -->
+        <div id="photoPreviewContainer" style="display:none;">
+            <img id="photoPreview" class="plant-photo" src="" alt="Foto de la planta">
+            <div class="photo-buttons">
+                <button class="btn btn-foto" onclick="document.getElementById('photoInput').click()">📸 Cambiar Foto</button>
+                <button class="btn btn-eliminar" onclick="removePhoto()">🗑️ Eliminar Foto</button>
+            </div>
+        </div>
+        <div id="photoPlaceholder" class="plant-photo-placeholder" onclick="document.getElementById('photoInput').click()">
+            📷
+        </div>
+        <p style="text-align:center;color:#999;font-size:14px;margin-bottom:15px;">Toca la imagen para hacer una foto</p>
+        
+        <input type="file" id="photoInput" accept="image/*" capture="environment" style="display:none;" onchange="handlePhotoSelect(event)">
+        
         <input type="text" id="plantName" placeholder="Nombre de tu planta" maxlength="50">
         <select id="plantType">
             <option value="suculenta">🌵 Suculenta/Cactus - Cada 14 días</option>
@@ -40,14 +74,16 @@
             <option value="exterior">🌸 Exterior - Cada 2 días</option>
         </select>
         <input type="time" id="reminderTime" value="08:00">
-        <textarea id="notes" placeholder="Notas adicionales..." style="width:100%;height:80px;margin:10px 0;padding:15px;border:1px solid #ddd;border-radius:10px;"></textarea>
-        <button class="btn" onclick="savePlant()" style="width:100%;">🌱 Añadir Planta</button>
-        <button onclick="closeModal()" style="width:100%;margin-top:10px;background:#f44336;color:white;border:none;padding:15px;border-radius:25px;font-size:18px;">Cancelar</button>
+        <textarea id="notes" placeholder="Notas adicionales..." style="height:80px;"></textarea>
+        <button class="btn" onclick="savePlant()">🌱 Guardar Planta</button>
+        <button class="btn btn-eliminar" onclick="closeModal()" style="margin-top:5px;">Cancelar</button>
     </div>
 
     <script>
         // Base de datos local
         let plants = JSON.parse(localStorage.getItem('jesuset_plants') || '[]');
+        let editingPlantId = null;
+        let currentPhotoData = null;
         
         const plantConfig = {
             suculenta: { frecuencia: 14, agua: 'Muy poca', icono: '🌵', consejo: 'Esperar a que la tierra esté completamente seca' },
@@ -56,12 +92,68 @@
             exterior: { frecuencia: 2, agua: 'Abundante', icono: '🌸', consejo: 'Verificar según temperatura y exposición al sol' }
         };
 
-        function showAddPlant() {
-            document.getElementById('addPlantModal').style.display = 'block';
+        function handlePhotoSelect(event) {
+            const file = event.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    currentPhotoData = e.target.result;
+                    document.getElementById('photoPreview').src = currentPhotoData;
+                    document.getElementById('photoPreviewContainer').style.display = 'block';
+                    document.getElementById('photoPlaceholder').style.display = 'none';
+                };
+                reader.readAsDataURL(file);
+            }
+        }
+
+        function removePhoto() {
+            currentPhotoData = null;
+            document.getElementById('photoPreviewContainer').style.display = 'none';
+            document.getElementById('photoPlaceholder').style.display = 'flex';
+            document.getElementById('photoInput').value = '';
+        }
+
+        function showAddPlant(plantId = null) {
+            editingPlantId = plantId;
+            currentPhotoData = null;
+            
+            if (plantId) {
+                const plant = plants.find(p => p.id === plantId);
+                if (plant) {
+                    document.getElementById('modalTitle').textContent = '✏️ Editar Planta';
+                    document.getElementById('plantName').value = plant.nombre;
+                    document.getElementById('plantType').value = plant.tipo;
+                    document.getElementById('reminderTime').value = plant.horaRecordatorio;
+                    document.getElementById('notes').value = plant.notas || '';
+                    
+                    if (plant.foto) {
+                        currentPhotoData = plant.foto;
+                        document.getElementById('photoPreview').src = plant.foto;
+                        document.getElementById('photoPreviewContainer').style.display = 'block';
+                        document.getElementById('photoPlaceholder').style.display = 'none';
+                    } else {
+                        document.getElementById('photoPreviewContainer').style.display = 'none';
+                        document.getElementById('photoPlaceholder').style.display = 'flex';
+                    }
+                }
+            } else {
+                document.getElementById('modalTitle').textContent = '🌱 Añadir Nueva Planta';
+                document.getElementById('plantName').value = '';
+                document.getElementById('plantType').value = 'interior_moderado';
+                document.getElementById('reminderTime').value = '08:00';
+                document.getElementById('notes').value = '';
+                document.getElementById('photoPreviewContainer').style.display = 'none';
+                document.getElementById('photoPlaceholder').style.display = 'flex';
+            }
+            
+            document.getElementById('photoInput').value = '';
+            document.getElementById('plantModal').style.display = 'block';
         }
 
         function closeModal() {
-            document.getElementById('addPlantModal').style.display = 'none';
+            document.getElementById('plantModal').style.display = 'none';
+            editingPlantId = null;
+            currentPhotoData = null;
         }
 
         function savePlant() {
@@ -73,31 +165,50 @@
             const time = document.getElementById('reminderTime').value;
             const notes = document.getElementById('notes').value;
             
-            const plant = {
-                id: Date.now(),
-                nombre: name,
-                tipo: type,
-                frecuencia: config.frecuencia,
-                cantidadAgua: config.agua,
-                icono: config.icono,
-                consejo: config.consejo,
-                horaRecordatorio: time,
-                notas: notes,
-                ultimaVezRegada: new Date().toISOString(),
-                proximoRiego: calcularProximoRiego(config.frecuencia)
-            };
+            if (editingPlantId) {
+                // Editar planta existente
+                const plant = plants.find(p => p.id === editingPlantId);
+                if (plant) {
+                    plant.nombre = name;
+                    plant.tipo = type;
+                    plant.frecuencia = config.frecuencia;
+                    plant.cantidadAgua = config.agua;
+                    plant.icono = config.icono;
+                    plant.consejo = config.consejo;
+                    plant.horaRecordatorio = time;
+                    plant.notas = notes;
+                    if (currentPhotoData) {
+                        plant.foto = currentPhotoData;
+                    }
+                }
+            } else {
+                // Nueva planta
+                const plant = {
+                    id: Date.now(),
+                    nombre: name,
+                    tipo: type,
+                    frecuencia: config.frecuencia,
+                    cantidadAgua: config.agua,
+                    icono: config.icono,
+                    consejo: config.consejo,
+                    horaRecordatorio: time,
+                    notas: notes,
+                    foto: currentPhotoData,
+                    ultimaVezRegada: new Date().toISOString(),
+                    proximoRiego: calcularProximoRiego(config.frecuencia)
+                };
+                plants.push(plant);
+            }
             
-            plants.push(plant);
             localStorage.setItem('jesuset_plants', JSON.stringify(plants));
-            
-            // Programar notificación
-            scheduleNotification(plant);
-            
             closeModal();
-            document.getElementById('plantName').value = '';
-            document.getElementById('notes').value = '';
             renderApp();
-            alert('✅ ¡Planta añadida!\nJesuset te ayudará a recordar cuidarla');
+            
+            if (editingPlantId) {
+                alert('✅ ¡Planta actualizada!\nLos cambios se han guardado correctamente');
+            } else {
+                alert('✅ ¡Planta añadida!\nJesuset te ayudará a recordar cuidarla');
+            }
         }
 
         function calcularProximoRiego(frecuencia) {
@@ -112,36 +223,16 @@
                 plant.ultimaVezRegada = new Date().toISOString();
                 plant.proximoRiego = calcularProximoRiego(plant.frecuencia);
                 localStorage.setItem('jesuset_plants', JSON.stringify(plants));
-                scheduleNotification(plant);
                 renderApp();
                 alert('✅ ¡Regada!\nJesuset se alegra de que cuides tu planta 🙏');
             }
         }
 
         function eliminarPlanta(id) {
-            if (confirm('¿Eliminar esta planta?')) {
+            if (confirm('¿Eliminar esta planta? Esta acción no se puede deshacer.')) {
                 plants = plants.filter(p => p.id !== id);
                 localStorage.setItem('jesuset_plants', JSON.stringify(plants));
                 renderApp();
-            }
-        }
-
-        function scheduleNotification(plant) {
-            if ('Notification' in window && Notification.permission === 'granted') {
-                const [hora, minutos] = plant.horaRecordatorio.split(':');
-                const fechaNotificacion = new Date(plant.proximoRiego);
-                fechaNotificacion.setHours(parseInt(hora), parseInt(minutos), 0, 0);
-                
-                const tiempoEspera = fechaNotificacion.getTime() - Date.now();
-                if (tiempoEspera > 0) {
-                    setTimeout(() => {
-                        new Notification('🌿 ¡Regar ' + plant.nombre + '!', {
-                            body: plant.cantidadAgua + ' agua - Jesuset te lo recuerda',
-                            icon: '🌿',
-                            tag: 'jesuset-riego'
-                        });
-                    }, tiempoEspera);
-                }
             }
         }
 
@@ -157,33 +248,49 @@
 
             let html = '';
             
+            // Plantas para regar hoy
             if (plantasHoy.length > 0) {
                 html += '<div class="card today"><h2>🌊 Regar Hoy</h2>';
                 html += '<p style="color:#666;margin-bottom:15px;">Jesuset te recuerda cuidar su creación</p>';
                 plantasHoy.forEach(p => {
-                    html += `<div style="background:#FFF9C4;padding:15px;border-radius:10px;margin-bottom:10px;">
-                        <h3>${p.nombre}</h3>
+                    html += `<div style="background:#FFF9C4;padding:15px;border-radius:10px;margin-bottom:10px;">`;
+                    if (p.foto) {
+                        html += `<img src="${p.foto}" class="plant-photo" alt="${p.nombre}">`;
+                    }
+                    html += `<h3>${p.icono} ${p.nombre}</h3>
                         <p>${p.cantidadAgua} agua</p>
                         <p style="color:#666;font-style:italic;">${p.consejo}</p>
-                        <button class="btn btn-regar" onclick="regarPlanta(${p.id})">💧 Regar Ahora</button>
+                        <div class="photo-buttons">
+                            <button class="btn btn-regar" onclick="regarPlanta(${p.id})">💧 Regar Ahora</button>
+                            <button class="btn" onclick="showAddPlant(${p.id})">✏️ Editar</button>
+                        </div>
                     </div>`;
                 });
                 html += '</div>';
             }
 
+            // Próximos riegos
             html += '<div class="card"><h2>📅 Próximos Riegos</h2>';
             if (plants.length > 0) {
                 plants.sort((a, b) => new Date(a.proximoRiego) - new Date(b.proximoRiego)).forEach(p => {
                     const diasFaltantes = Math.ceil((new Date(p.proximoRiego) - hoy) / (1000 * 60 * 60 * 24));
-                    html += `<div style="display:flex;justify-content:space-between;align-items:center;padding:15px;border-bottom:1px solid #eee;">
-                        <div>
-                            <strong>${p.icono} ${p.nombre}</strong>
-                            ${p.notas ? `<br><small style="color:#999;">${p.notas}</small>` : ''}
+                    html += `<div class="plant-card">
+                        <div class="plant-header">`;
+                    if (p.foto) {
+                        html += `<img src="${p.foto}" class="mini-photo" alt="${p.nombre}">`;
+                    }
+                    html += `<div class="plant-info">
+                                <strong>${p.icono} ${p.nombre}</strong>
+                                ${p.notas ? `<br><small style="color:#999;">${p.notas}</small>` : ''}
+                            </div>
                         </div>
-                        <div style="text-align:right;">
-                            <div style="color:#FF9800;font-weight:bold;">${diasFaltantes === 0 ? 'Hoy' : `En ${diasFaltantes} días`}</div>
+                        <div class="plant-actions">
+                            <div style="color:#FF9800;font-weight:bold;text-align:right;">${diasFaltantes === 0 ? 'Hoy' : `En ${diasFaltantes} días`}</div>
                             <small style="color:#999;">${new Date(p.proximoRiego).toLocaleDateString('es-ES', {weekday:'short', month:'short', day:'numeric'})}</small>
-                            <br><button onclick="eliminarPlanta(${p.id})" style="background:none;border:none;color:#f44336;margin-top:5px;">🗑️</button>
+                            <div style="display:flex;gap:5px;">
+                                <button onclick="showAddPlant(${p.id})" style="background:#2196F3;color:white;border:none;padding:5px 10px;border-radius:15px;font-size:12px;cursor:pointer;">✏️</button>
+                                <button onclick="eliminarPlanta(${p.id})" style="background:#f44336;color:white;border:none;padding:5px 10px;border-radius:15px;font-size:12px;cursor:pointer;">🗑️</button>
+                            </div>
                         </div>
                     </div>`;
                 });
@@ -193,16 +300,6 @@
             html += '</div>';
             
             document.getElementById('app').innerHTML = html;
-        }
-
-        // Solicitar permisos de notificación
-        if ('Notification' in window) {
-            Notification.requestPermission();
-        }
-
-        // Service Worker para funcionar offline
-        if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('sw.js');
         }
 
         // Iniciar
