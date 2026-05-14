@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Jesuset Riego">
+    <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌿</text></svg>">
+    <title>🌿 Jesuset Riego</title>
+    <link rel="manifest" href="manifest.json">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, sans-serif; background: #F1F8E9; }
+        .header { background: #4CAF50; color: white; padding: 20px; text-align: center; }
+        .container { padding: 20px; }
+        .card { background: white; padding: 20px; border-radius: 15px; margin: 10px 0; }
+        .btn { background: #4CAF50; color: white; border: none; padding: 15px 30px; border-radius: 25px; font-size: 18px; cursor: pointer; }
+        .btn-regar { background: #FF9800; margin-top: 10px; }
+        .fab { position: fixed; bottom: 20px; right: 20px; background: #4CAF50; color: white; width: 60px; height: 60px; border-radius: 30px; display: flex; align-items: center; justify-content: center; font-size: 30px; text-decoration: none; box-shadow: 0 4px 12px rgba(0,0,0,0.3); }
+        .today { background: #FFF9C4; }
+        select, input { width: 100%; padding: 15px; margin: 10px 0; border: 1px solid #ddd; border-radius: 10px; font-size: 16px; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🌿 Jesuset Riego</h1>
+        <p>Jesuset te recuerda cuidar su creación</p>
+    </div>
+    <div class="container" id="app"></div>
+    <a href="#" class="fab" onclick="showAddPlant()">+</a>
+
+    <div id="addPlantModal" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:white; z-index:1000; padding:20px; overflow-y:auto;">
+        <h2>🌱 Añadir Nueva Planta</h2>
+        <input type="text" id="plantName" placeholder="Nombre de tu planta" maxlength="50">
+        <select id="plantType">
+            <option value="suculenta">🌵 Suculenta/Cactus - Cada 14 días</option>
+            <option value="interior_frecuente">🌿 Interior Frecuente - Cada 3 días</option>
+            <option value="interior_moderado">🪴 Interior Moderado - Cada 7 días</option>
+            <option value="exterior">🌸 Exterior - Cada 2 días</option>
+        </select>
+        <input type="time" id="reminderTime" value="08:00">
+        <textarea id="notes" placeholder="Notas adicionales..." style="width:100%;height:80px;margin:10px 0;padding:15px;border:1px solid #ddd;border-radius:10px;"></textarea>
+        <button class="btn" onclick="savePlant()" style="width:100%;">🌱 Añadir Planta</button>
+        <button onclick="closeModal()" style="width:100%;margin-top:10px;background:#f44336;color:white;border:none;padding:15px;border-radius:25px;font-size:18px;">Cancelar</button>
+    </div>
+
+    <script>
+        // Base de datos local
+        let plants = JSON.parse(localStorage.getItem('jesuset_plants') || '[]');
+        
+        const plantConfig = {
+            suculenta: { frecuencia: 14, agua: 'Muy poca', icono: '🌵', consejo: 'Esperar a que la tierra esté completamente seca' },
+            interior_frecuente: { frecuencia: 3, agua: 'Moderada', icono: '🌿', consejo: 'Mantener la tierra húmeda sin encharcar' },
+            interior_moderado: { frecuencia: 7, agua: 'Moderada', icono: '🪴', consejo: 'Regar cuando los primeros 3cm de tierra estén secos' },
+            exterior: { frecuencia: 2, agua: 'Abundante', icono: '🌸', consejo: 'Verificar según temperatura y exposición al sol' }
+        };
+
+        function showAddPlant() {
+            document.getElementById('addPlantModal').style.display = 'block';
+        }
+
+        function closeModal() {
+            document.getElementById('addPlantModal').style.display = 'none';
+        }
+
+        function savePlant() {
+            const name = document.getElementById('plantName').value.trim();
+            if (!name) { alert('¡Dale un nombre a tu planta! 🌱'); return; }
+            
+            const type = document.getElementById('plantType').value;
+            const config = plantConfig[type];
+            const time = document.getElementById('reminderTime').value;
+            const notes = document.getElementById('notes').value;
+            
+            const plant = {
+                id: Date.now(),
+                nombre: name,
+                tipo: type,
+                frecuencia: config.frecuencia,
+                cantidadAgua: config.agua,
+                icono: config.icono,
+                consejo: config.consejo,
+                horaRecordatorio: time,
+                notas: notes,
+                ultimaVezRegada: new Date().toISOString(),
+                proximoRiego: calcularProximoRiego(config.frecuencia)
+            };
+            
+            plants.push(plant);
+            localStorage.setItem('jesuset_plants', JSON.stringify(plants));
+            
+            // Programar notificación
+            scheduleNotification(plant);
+            
+            closeModal();
+            document.getElementById('plantName').value = '';
+            document.getElementById('notes').value = '';
+            renderApp();
+            alert('✅ ¡Planta añadida!\nJesuset te ayudará a recordar cuidarla');
+        }
+
+        function calcularProximoRiego(frecuencia) {
+            const fecha = new Date();
+            fecha.setDate(fecha.getDate() + frecuencia);
+            return fecha.toISOString();
+        }
+
+        function regarPlanta(id) {
+            const plant = plants.find(p => p.id === id);
+            if (plant) {
+                plant.ultimaVezRegada = new Date().toISOString();
+                plant.proximoRiego = calcularProximoRiego(plant.frecuencia);
+                localStorage.setItem('jesuset_plants', JSON.stringify(plants));
+                scheduleNotification(plant);
+                renderApp();
+                alert('✅ ¡Regada!\nJesuset se alegra de que cuides tu planta 🙏');
+            }
+        }
+
+        function eliminarPlanta(id) {
+            if (confirm('¿Eliminar esta planta?')) {
+                plants = plants.filter(p => p.id !== id);
+                localStorage.setItem('jesuset_plants', JSON.stringify(plants));
+                renderApp();
+            }
+        }
+
+        function scheduleNotification(plant) {
+            if ('Notification' in window && Notification.permission === 'granted') {
+                const [hora, minutos] = plant.horaRecordatorio.split(':');
+                const fechaNotificacion = new Date(plant.proximoRiego);
+                fechaNotificacion.setHours(parseInt(hora), parseInt(minutos), 0, 0);
+                
+                const tiempoEspera = fechaNotificacion.getTime() - Date.now();
+                if (tiempoEspera > 0) {
+                    setTimeout(() => {
+                        new Notification('🌿 ¡Regar ' + plant.nombre + '!', {
+                            body: plant.cantidadAgua + ' agua - Jesuset te lo recuerda',
+                            icon: '🌿',
+                            tag: 'jesuset-riego'
+                        });
+                    }, tiempoEspera);
+                }
+            }
+        }
+
+        function renderApp() {
+            const hoy = new Date();
+            hoy.setHours(0, 0, 0, 0);
+            
+            let plantasHoy = plants.filter(p => {
+                const fechaRiego = new Date(p.proximoRiego);
+                fechaRiego.setHours(0, 0, 0, 0);
+                return fechaRiego.getTime() === hoy.getTime();
+            });
+
+            let html = '';
+            
+            if (plantasHoy.length > 0) {
+                html += '<div class="card today"><h2>🌊 Regar Hoy</h2>';
+                html += '<p style="color:#666;margin-bottom:15px;">Jesuset te recuerda cuidar su creación</p>';
+                plantasHoy.forEach(p => {
+                    html += `<div style="background:#FFF9C4;padding:15px;border-radius:10px;margin-bottom:10px;">
+                        <h3>${p.nombre}</h3>
+                        <p>${p.cantidadAgua} agua</p>
+                        <p style="color:#666;font-style:italic;">${p.consejo}</p>
+                        <button class="btn btn-regar" onclick="regarPlanta(${p.id})">💧 Regar Ahora</button>
+                    </div>`;
+                });
+                html += '</div>';
+            }
+
+            html += '<div class="card"><h2>📅 Próximos Riegos</h2>';
+            if (plants.length > 0) {
+                plants.sort((a, b) => new Date(a.proximoRiego) - new Date(b.proximoRiego)).forEach(p => {
+                    const diasFaltantes = Math.ceil((new Date(p.proximoRiego) - hoy) / (1000 * 60 * 60 * 24));
+                    html += `<div style="display:flex;justify-content:space-between;align-items:center;padding:15px;border-bottom:1px solid #eee;">
+                        <div>
+                            <strong>${p.icono} ${p.nombre}</strong>
+                            ${p.notas ? `<br><small style="color:#999;">${p.notas}</small>` : ''}
+                        </div>
+                        <div style="text-align:right;">
+                            <div style="color:#FF9800;font-weight:bold;">${diasFaltantes === 0 ? 'Hoy' : `En ${diasFaltantes} días`}</div>
+                            <small style="color:#999;">${new Date(p.proximoRiego).toLocaleDateString('es-ES', {weekday:'short', month:'short', day:'numeric'})}</small>
+                            <br><button onclick="eliminarPlanta(${p.id})" style="background:none;border:none;color:#f44336;margin-top:5px;">🗑️</button>
+                        </div>
+                    </div>`;
+                });
+            } else {
+                html += '<div style="text-align:center;padding:40px;"><div style="font-size:50px;">🌱</div><p>No tienes plantas registradas aún</p><p style="color:#999;">¡Jesuset quiere que cultives la creación!</p></div>';
+            }
+            html += '</div>';
+            
+            document.getElementById('app').innerHTML = html;
+        }
+
+        // Solicitar permisos de notificación
+        if ('Notification' in window) {
+            Notification.requestPermission();
+        }
+
+        // Service Worker para funcionar offline
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('sw.js');
+        }
+
+        // Iniciar
+        renderApp();
+    </script>
+</body>
+</html>
